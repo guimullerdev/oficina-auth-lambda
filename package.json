@@ -4,7 +4,7 @@
   "description": "Function Serverless de autenticacao por CPF — Tech Challenge Fase 3",
   "private": true,
   "scripts": {
-    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --outfile=dist/index.js",
+    "build": "esbuild src/handler.ts --bundle --platform=node --target=node22 --loader:.pem=text --outfile=dist/index.js",
     "package": "npm run build && cd dist && zip -qr ../function.zip index.js",
     "test": "jest",
     "test:cov": "jest --coverage",
@@ -29,6 +29,9 @@
     "preset": "ts-jest",
     "testEnvironment": "node",
     "roots": ["<rootDir>/src"],
+    "moduleNameMapper": {
+      "\\.pem$": "<rootDir>/test/pem-stub.ts"
+    },
     "collectCoverageFrom": ["src/**/*.ts", "!src/**/*.spec.ts"]
   }
 }
