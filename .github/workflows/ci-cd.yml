@@ -49,6 +49,11 @@ jobs:
     needs: build-and-test
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Enquanto a conta AWS não existir, o deploy é pulado com aviso visível
+    # em vez de derrubar o job — o build e os testes acima continuam sendo o
+    # gate de verdade.
+    env:
+      HAS_AWS: ${{ secrets.AWS_ACCESS_KEY_ID != '' && 'true' || 'false' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -66,9 +71,25 @@ jobs:
         with:
           terraform_version: ${{ env.TF_VERSION }}
 
+      # Roda mesmo sem credencial: pega erro de sintaxe no Terraform sem
+      # depender da AWS.
+      - name: Terraform Validate
+        working-directory: terraform
+        run: |
+          terraform init -backend=false
+          terraform fmt -check -recursive
+          terraform validate
+
+      - name: Aviso — deploy pulado
+        if: env.HAS_AWS == 'false'
+        run: |
+          echo "::warning::Secrets de AWS não configurados; a função não foi publicada."
+          echo "::warning::Configure AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY para o deploy rodar."
+
       # AWS_SESSION_TOKEN só é usado se a conta for um AWS Academy Learner
       # Lab (credenciais temporárias); com IAM user comum o secret fica vazio.
       - uses: aws-actions/configure-aws-credentials@v4
+        if: env.HAS_AWS == 'true'
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -76,10 +97,12 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
 
       - name: Terraform Init
+        if: env.HAS_AWS == 'true'
         working-directory: terraform
-        run: terraform init -backend-config=backend.hcl
+        run: terraform init -reconfigure -backend-config=backend.hcl
 
       - name: Terraform Apply
+        if: env.HAS_AWS == 'true'
         working-directory: terraform
         env:
           TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
