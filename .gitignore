@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+function.zip
+
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+crash.*.log
+
+.env
+.env.*
