@@ -1,0 +1,89 @@
+name: CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: "22"
+  TF_VERSION: "1.9.8"
+
+jobs:
+  # Testes e build rodam sempre — inclusive em PR, onde são o gate do merge.
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Testes unitários (validação de CPF + handler)
+        run: npm run test:cov
+
+      - name: Empacotar função (zip)
+        run: npm run package
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: function-zip
+          path: function.zip
+          retention-days: 5
+
+  # Deploy só depois do merge em main — branch protegida exige PR, então
+  # isso nunca roda a partir de um push direto.
+  deploy:
+    needs: build-and-test
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Empacotar função (zip)
+        run: npm run package
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+
+      # AWS_SESSION_TOKEN só é usado se a conta for um AWS Academy Learner
+      # Lab (credenciais temporárias); com IAM user comum o secret fica vazio.
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Terraform Init
+        working-directory: terraform
+        run: terraform init -backend-config=backend.hcl
+
+      - name: Terraform Apply
+        working-directory: terraform
+        env:
+          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
+          # Vazio em conta normal; em Learner Lab, o ARN da LabRole.
+          TF_VAR_existing_role_arn: ${{ secrets.LAMBDA_ROLE_ARN }}
+        run: terraform apply -auto-approve -input=false
