@@ -10,6 +10,40 @@ MECANICO) continuam autenticando por email/senha na própria app, com o
 mecanismo dela. Os dois fluxos convivem — ver "Como o token conversa com a
 app" abaixo.
 
+## Deploy ativo
+
+Função `oficina-auth-cpf` (Node 22), publicada com dois aliases e exposta
+pelo API Gateway:
+
+| Ambiente | Endpoint |
+|---|---|
+| Produção | `POST https://7eu2kz40xj.execute-api.us-east-1.amazonaws.com/prod/auth/cpf` |
+| Homologação | `POST https://7eu2kz40xj.execute-api.us-east-1.amazonaws.com/homolog/auth/cpf` |
+
+```bash
+curl -s -X POST https://7eu2kz40xj.execute-api.us-east-1.amazonaws.com/prod/auth/cpf \
+  -H 'content-type: application/json' \
+  -d '{"cpf":"69759054876"}'
+```
+
+Os quatro desfechos possíveis:
+
+| Situação | Resposta |
+|---|---|
+| CPF válido de cliente ativo | `200` + `accessToken` |
+| CPF válido de cliente inativo | `403 Cliente inativo` |
+| CPF válido não cadastrado | `404 Cliente não encontrado` |
+| CPF com dígito verificador inválido | `400 CPF inválido` |
+
+Os dois stages atendem **bancos diferentes**, então o mesmo CPF pode responder
+`200` em produção e `404` em homologação. Ver "Ambientes".
+
+**Observabilidade**: https://onenr.io/0qwykVVv1jn
+
+> Infraestrutura de curso, provisionada para a avaliação e destruída depois.
+> Se o endpoint não responder, o `terraform destroy` já rodou — todo o
+> provisionamento está em `terraform/`.
+
 ## Stack
 
 - Node.js 22 (TypeScript), empacotado em zip via esbuild

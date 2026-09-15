@@ -58,7 +58,7 @@ describe('handler — caminho feliz', () => {
       documento: CPF_VALIDO,
       role: 'CLIENTE',
     });
-    // email não entra: é opcional em Cliente (ver plan.md, Fase 0)
+    // email não entra: é opcional em Cliente (ver RFC 0003, no repo da app)
     expect(payload.email).toBeUndefined();
   });
 
