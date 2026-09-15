@@ -19,12 +19,30 @@ variable "database_url_homolog" {
   description = "Connection string do database oficina_homolog — vem do output de oficina-infra-db/bootstrap-db, via secret do pipeline"
   type        = string
   sensitive   = true
+
+  # Um secret que não existe no GitHub vira TF_VAR_* com string vazia, e
+  # `type = string` sem default aceita isso como valor legítimo: o apply
+  # passa e publica a função com credencial nenhuma. Foi o que aconteceu no
+  # merge do PR #4 — autenticação caiu em produção com apply "bem-sucedido".
+  validation {
+    condition     = trimspace(var.database_url_homolog) != ""
+    error_message = "database_url_homolog está vazia. Confira o secret DATABASE_URL_HOMOLOG no repositório."
+  }
 }
 
 variable "database_url_prod" {
   description = "Connection string do database oficina_prod — vem do output de oficina-infra-db/bootstrap-db, via secret do pipeline"
   type        = string
   sensitive   = true
+
+  # Um secret que não existe no GitHub vira TF_VAR_* com string vazia, e
+  # `type = string` sem default aceita isso como valor legítimo: o apply
+  # passa e publica a função com credencial nenhuma. Foi o que aconteceu no
+  # merge do PR #4 — autenticação caiu em produção com apply "bem-sucedido".
+  validation {
+    condition     = trimspace(var.database_url_prod) != ""
+    error_message = "database_url_prod está vazia. Confira o secret DATABASE_URL_PROD no repositório."
+  }
 }
 
 variable "jwt_secret" {
