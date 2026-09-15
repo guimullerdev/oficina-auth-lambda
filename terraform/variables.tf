@@ -15,8 +15,14 @@ variable "package_path" {
   default     = "../function.zip"
 }
 
-variable "database_url" {
-  description = "Connection string do RDS — vem do output de oficina-infra-db/bootstrap-db, via secret do pipeline"
+variable "database_url_homolog" {
+  description = "Connection string do database oficina_homolog — vem do output de oficina-infra-db/bootstrap-db, via secret do pipeline"
+  type        = string
+  sensitive   = true
+}
+
+variable "database_url_prod" {
+  description = "Connection string do database oficina_prod — vem do output de oficina-infra-db/bootstrap-db, via secret do pipeline"
   type        = string
   sensitive   = true
 }

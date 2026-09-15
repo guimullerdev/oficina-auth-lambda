@@ -12,9 +12,11 @@ export interface Cliente {
   ativo: boolean;
 }
 
-// Pool no escopo do módulo: sobrevive entre invocações enquanto o container
-// Lambda estiver quente, evitando abrir conexão nova a cada request.
-let pool: Pool | undefined;
+// Um pool por ambiente, não um só. Dois aliases podem apontar para a mesma
+// versão publicada e, nesse caso, compartilham o mesmo container quente — um
+// pool único no escopo do módulo acabaria servindo homologação com a conexão
+// de produção, dependendo de quem chegou primeiro.
+const pools = new Map<string, Pool>();
 
 // `pg` dá precedência ao que vem parseado da connectionString sobre o config
 // explícito (ver connection-parameters.js). Um `sslmode` na URL viraria
@@ -26,30 +28,32 @@ export function stripSslMode(databaseUrl: string): string {
   return url.toString();
 }
 
-function getPool(): Pool {
-  if (!pool) {
-    const databaseUrl = process.env.DATABASE_URL;
-    if (!databaseUrl) {
-      throw new Error('DATABASE_URL não configurada');
-    }
-
-    pool = new Pool({
-      connectionString: stripSslMode(databaseUrl),
-      // rejectUnauthorized fica no default (true): com a CA correta em mãos
-      // não há motivo para abrir mão da validação de cadeia e de hostname.
-      ssl: { ca: rdsCaBundle },
-      max: 1,
-      idleTimeoutMillis: 30_000,
-      connectionTimeoutMillis: 5_000,
-    });
+function getPool(ambiente: string, databaseUrl: string): Pool {
+  const existente = pools.get(ambiente);
+  if (existente) {
+    return existente;
   }
+
+  const pool = new Pool({
+    connectionString: stripSslMode(databaseUrl),
+    // rejectUnauthorized fica no default (true): com a CA correta em mãos
+    // não há motivo para abrir mão da validação de cadeia e de hostname.
+    ssl: { ca: rdsCaBundle },
+    max: 1,
+    idleTimeoutMillis: 30_000,
+    connectionTimeoutMillis: 5_000,
+  });
+
+  pools.set(ambiente, pool);
   return pool;
 }
 
 export async function findClienteByDocumento(
   documento: string,
+  ambiente: string,
+  databaseUrl: string,
 ): Promise<Cliente | null> {
-  const result = await getPool().query<Cliente>(
+  const result = await getPool(ambiente, databaseUrl).query<Cliente>(
     'SELECT id, nome, ativo FROM clientes WHERE documento = $1 LIMIT 1',
     [documento],
   );
