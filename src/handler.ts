@@ -5,6 +5,7 @@ import type {
   Context,
 } from 'aws-lambda';
 
+import { resolverConexao } from './ambiente';
 import { findClienteByDocumento } from './clientes.repository';
 import { isValidCpf, normalizeCpf } from './cpf';
 import { signClienteToken } from './jwt';
@@ -59,9 +60,23 @@ export async function handler(
     return respond(400, { message: 'CPF inválido' }, correlationId);
   }
 
+  // Qual banco responder depende do alias invocado, não de uma variável
+  // global: os dois aliases podem compartilhar a mesma versão publicada.
+  let ambiente: string;
+  let databaseUrl: string;
+  try {
+    ({ ambiente, databaseUrl } = resolverConexao(context?.invokedFunctionArn));
+  } catch (error) {
+    log('error', 'nao foi possivel resolver o ambiente', {
+      correlationId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return respond(500, { message: 'Erro de configuração' }, correlationId);
+  }
+
   let cliente: Awaited<ReturnType<typeof findClienteByDocumento>>;
   try {
-    cliente = await findClienteByDocumento(documento);
+    cliente = await findClienteByDocumento(documento, ambiente, databaseUrl);
   } catch (error) {
     log('error', 'falha ao consultar cliente no banco', {
       correlationId,

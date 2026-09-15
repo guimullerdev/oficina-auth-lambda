@@ -105,7 +105,8 @@ jobs:
         if: env.HAS_AWS == 'true'
         working-directory: terraform
         env:
-          TF_VAR_database_url: ${{ secrets.DATABASE_URL }}
+          TF_VAR_database_url_homolog: ${{ secrets.DATABASE_URL_HOMOLOG }}
+          TF_VAR_database_url_prod: ${{ secrets.DATABASE_URL_PROD }}
           TF_VAR_jwt_secret: ${{ secrets.JWT_SECRET }}
           # Vazio em conta normal; em Learner Lab, o ARN da LabRole.
           TF_VAR_existing_role_arn: ${{ secrets.LAMBDA_ROLE_ARN }}

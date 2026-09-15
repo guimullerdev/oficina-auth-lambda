@@ -122,8 +122,9 @@ de secrets do pipeline, nunca versionadas.
   atualizando a função e os aliases.
 
 Secrets necessários no repositório: `AWS_ACCESS_KEY_ID`,
-`AWS_SECRET_ACCESS_KEY`, `DATABASE_URL`, `JWT_SECRET` e — só se a conta for
-Learner Lab — `AWS_SESSION_TOKEN` e `LAMBDA_ROLE_ARN`.
+`AWS_SECRET_ACCESS_KEY`, `DATABASE_URL_HOMOLOG`, `DATABASE_URL_PROD`,
+`JWT_SECRET` e — só se a conta for Learner Lab — `AWS_SESSION_TOKEN` e
+`LAMBDA_ROLE_ARN`.
 
 ## Sobre o Dockerfile
 
@@ -136,7 +137,23 @@ gerado pelo esbuild (`npm run package`), sem `node_modules` no artefato.
 
 Dois aliases da mesma função, `homolog` e `prod` (ADR 0002). O API Gateway
 tem um stage por ambiente, cada um invocando seu alias. Lambda não cobra por
-alias ocioso, então a separação sai de graça.
+alias ocioso.
+
+**O alias sozinho não separa configuração.** Variável de ambiente no Lambda
+pertence à *versão publicada*, e os dois aliases apontam para a mesma versão
+— uma `DATABASE_URL` única faria homologação e produção lerem o mesmo banco.
+Foi exatamente o que aconteceu no primeiro deploy: `/homolog/auth/cpf`
+autenticava clientes que só existiam em produção.
+
+Quem separa de fato é o handler. A função recebe `DATABASE_URL_HOMOLOG` e
+`DATABASE_URL_PROD`, lê o alias invocado de `context.invokedFunctionArn` e
+escolhe a connection string correspondente (`src/ambiente.ts`). Cada ambiente
+tem seu próprio pool de conexões, porque dois aliases na mesma versão podem
+compartilhar o mesmo container quente.
+
+Invocação sem alias (`$LATEST`, teste manual no console) **falha com 500**, de
+propósito: qualquer default escolheria entre servir homologação com dados de
+produção ou o contrário.
 
 ## Documentação relacionada
 

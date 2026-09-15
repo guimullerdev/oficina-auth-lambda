@@ -81,11 +81,16 @@ resource "aws_lambda_function" "auth_cpf" {
     security_group_ids = [aws_security_group.lambda.id]
   }
 
+  # Uma entrada por ambiente, e não uma `DATABASE_URL` só: variável de
+  # ambiente pertence à versão publicada, não ao alias. Com os dois aliases
+  # na mesma versão, uma chave única faria homologação e produção lerem o
+  # mesmo banco. Quem escolhe entre elas é o handler, pelo alias invocado.
   environment {
     variables = {
-      DATABASE_URL   = var.database_url
-      JWT_SECRET     = var.jwt_secret
-      JWT_EXPIRES_IN = var.jwt_expires_in
+      DATABASE_URL_HOMOLOG = var.database_url_homolog
+      DATABASE_URL_PROD    = var.database_url_prod
+      JWT_SECRET           = var.jwt_secret
+      JWT_EXPIRES_IN       = var.jwt_expires_in
     }
   }
 
@@ -93,7 +98,12 @@ resource "aws_lambda_function" "auth_cpf" {
 }
 
 # Dois aliases apontando pra mesma função, um por ambiente (ver ADR 0002).
-# Lambda não cobra por alias ocioso, então isso é separação de ambiente de graça.
+# Lambda não cobra por alias ocioso.
+#
+# O alias sozinho **não** separa configuração: `environment` pertence à versão
+# publicada, e as duas apontam para a mesma. Quem separa de fato é o handler,
+# que lê o alias de `context.invokedFunctionArn` e escolhe entre
+# DATABASE_URL_HOMOLOG e DATABASE_URL_PROD (ver src/ambiente.ts).
 resource "aws_lambda_alias" "environment" {
   for_each = toset(["homolog", "prod"])
 
