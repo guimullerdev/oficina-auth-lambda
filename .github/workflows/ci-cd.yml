@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Permite reaplicar o Terraform sem um commit novo, p.ex. depois de trocar o
+  # secret DATABASE_URL_PROD. Runs antigos não podem ser reexecutados (> 1 mês).
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -47,7 +50,7 @@ jobs:
   # isso nunca roda a partir de um push direto.
   deploy:
     needs: build-and-test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     # Enquanto a conta AWS não existir, o deploy é pulado com aviso visível
     # em vez de derrubar o job — o build e os testes acima continuam sendo o
